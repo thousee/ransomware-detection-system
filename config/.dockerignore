@@ -1,0 +1,67 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis
+.pytest_cache
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+ransomware_env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/_build/
+
+# Logs and databases
+*.log
+*.db
+*.sqlite
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+# Large data files (optional)
+data/training/*.csv
+data/test/*.csv
+reports/*.json
+
+# Development files
+.env
+.env.local
+Makefile.local
+docker-compose.override.yml
+
+# CI/CD
+.github/
+.travis.yml
+.circleci/

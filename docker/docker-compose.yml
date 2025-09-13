@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  ransomware-detector:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - WEB_DEBUG=false
+      - MAX_CPU_USAGE=10
+      - MAX_MEMORY_USAGE=100
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ./reports:/app/reports
+      - ./test_data:/app/test_data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/system_status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Optional: Add a reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - ransomware-detector
+    restart: unless-stopped
+    profiles:
+      - production
