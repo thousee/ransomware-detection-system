@@ -11,7 +11,10 @@ import psutil
 import random
 from config import Config
 
-app = Flask(__name__, template_folder='../template')
+# Calculate the absolute path to the template directory
+TEMPLATE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'template'))
+
+app = Flask(__name__, template_folder=TEMPLATE_DIR)
 app.config['SECRET_KEY'] = Config.SECRET_KEY
 socketio = SocketIO(app, cors_allowed_origins="*")
 

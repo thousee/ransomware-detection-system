@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import json
 import logging
+from config import Config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,35 +26,35 @@ class TestDataGenerator:
                 'file_ops_rate': (100, 300),
                 'cpu_usage': (70, 95),
                 'memory_usage': (60, 85),
-                'suspicious_extensions': ['.WNCRY', '.wcry'],
+                'suspicious_extensions': Config.SUSPICIOUS_EXTENSIONS, # Use Config for suspicious extensions
                 'network_activity': (5, 15)
             },
             'Locky': {
                 'file_ops_rate': (80, 250),
                 'cpu_usage': (60, 90),
                 'memory_usage': (50, 80),
-                'suspicious_extensions': ['.locky', '.thor'],
+                'suspicious_extensions': Config.SUSPICIOUS_EXTENSIONS, # Use Config for suspicious extensions
                 'network_activity': (3, 10)
             },
             'CryptoLocker': {
                 'file_ops_rate': (120, 400),
                 'cpu_usage': (80, 100),
                 'memory_usage': (70, 95),
-                'suspicious_extensions': ['.encrypted', '.locked'],
+                'suspicious_extensions': Config.SUSPICIOUS_EXTENSIONS, # Use Config for suspicious extensions
                 'network_activity': (8, 20)
             },
             'Cerber': {
                 'file_ops_rate': (90, 280),
                 'cpu_usage': (65, 85),
                 'memory_usage': (55, 75),
-                'suspicious_extensions': ['.cerber', '.cerber2'],
+                'suspicious_extensions': Config.SUSPICIOUS_EXTENSIONS, # Use Config for suspicious extensions
                 'network_activity': (4, 12)
             },
             'Petya': {
                 'file_ops_rate': (150, 500),
                 'cpu_usage': (85, 100),
                 'memory_usage': (75, 95),
-                'suspicious_extensions': ['.petya', '.red'],
+                'suspicious_extensions': Config.SUSPICIOUS_EXTENSIONS, # Use Config for suspicious extensions
                 'network_activity': (10, 25)
             }
         }
@@ -406,6 +407,81 @@ class TestDataGenerator:
                 
         return self.save_dataset(analysis_data, "feature_analysis")
 
+    def simulate_ransomware_activity_in_directory(self, target_directory, num_files=10, duration_seconds=30):
+        """Simulate ransomware activity by creating/modifying/deleting files in a target directory."""
+        logger.info(f"Simulating ransomware activity in {target_directory} for {duration_seconds} seconds...")
+        
+        target_path = Path(target_directory)
+        target_path.mkdir(parents=True, exist_ok=True)
+
+        start_time = time.time()
+        operations_count = 0
+
+        # Create some initial dummy files if the directory is empty
+        if not any(target_path.iterdir()):
+            logger.info("Creating initial dummy files...")
+            for i in range(5):
+                dummy_file = target_path / f"normal_file_{i}.txt"
+                with open(dummy_file, 'w') as f:
+                    f.write("This is a normal file content.")
+
+        while (time.time() - start_time) < duration_seconds:
+            operation = random.choice(['create', 'modify', 'delete'])
+            files_in_dir = list(target_path.iterdir())
+
+            if operation == 'create' or not files_in_dir:
+                # Create new suspicious files
+                filename = f"encrypted_file_{int(time.time() * 1000)}_{random.randint(0, 999)}{random.choice(list(Config.SUSPICIOUS_EXTENSIONS))}"
+                file_path = target_path / filename
+                try:
+                    with open(file_path, 'w') as f:
+                        f.write(f"Ransomware content: {random.random()}")
+                    logger.debug(f"Created {file_path}")
+                    operations_count += 1
+                except OSError as e:
+                    logger.warning(f"Could not create file {file_path}: {e}")
+
+            elif operation == 'modify':
+                # Modify existing files with suspicious content/extensions
+                if files_in_dir:
+                    file_to_modify = random.choice(files_in_dir)
+                    new_extension = random.choice(list(Config.SUSPICIOUS_EXTENSIONS))
+                    new_file_path = file_to_modify.parent / (file_to_modify.stem + new_extension)
+                    try:
+                        if file_to_modify.is_file():
+                            with open(file_to_modify, 'a') as f:
+                                f.write(f"\nModified by ransomware: {random.random()}")
+                            if file_to_modify != new_file_path:
+                                file_to_modify.rename(new_file_path)
+                            logger.debug(f"Modified/renamed {file_to_modify} to {new_file_path}")
+                            operations_count += 1
+                        else:
+                            logger.debug(f"Skipping modification of non-file: {file_to_modify}")
+                    except OSError as e:
+                        logger.warning(f"Could not modify/rename file {file_to_modify}: {e}")
+
+            elif operation == 'delete':
+                # Delete some files
+                if files_in_dir:
+                    file_to_delete = random.choice(files_in_dir)
+                    try:
+                        if file_to_delete.is_file():
+                            file_to_delete.unlink()
+                            logger.debug(f"Deleted {file_to_delete}")
+                            operations_count += 1
+                        else:
+                            logger.debug(f"Skipping deletion of non-file: {file_to_delete}")
+                    except OSError as e:
+                        logger.warning(f"Could not delete file {file_to_delete}: {e}")
+
+            time.sleep(random.uniform(0.1, 0.5))  # Simulate activity bursts
+        
+        logger.info(f"Simulated {operations_count} ransomware-like operations.")
+
+
+
+
+
     def generate_normal_sample(self, activity_type, duration_minutes=10, samples_per_minute=12):
         """Generate normal system activity data"""
         activity = self.normal_activities[activity_type]
@@ -536,7 +612,7 @@ def main():
     
     print(f"\n📁 All files saved in: {generator.output_dir}/")
     print("🎯 Ready for testing and training!")
-    
+
     # Optionally start live stream demo
     response = input("\nStart live data stream demo? (y/n): ")
     if response.lower() == 'y':
@@ -546,6 +622,16 @@ def main():
                   f"Risk: {risk_level} - Family: {sample['family']}")
                   
         generator.generate_live_stream("escalating_threat", stream_callback)
+
+    # Optionally simulate ransomware activity in a monitored directory
+    ransomware_sim_response = input("\nSimulate ransomware activity in a monitored directory (y/n)? ")
+    if ransomware_sim_response.lower() == 'y':
+        target_dir = input(f"Enter the target directory to simulate ransomware (e.g., {Config.FILE_MONITOR_PATHS[0]}): ")
+        if not target_dir:
+            target_dir = Config.FILE_MONITOR_PATHS[0] # Use the first monitored path from config as default
+
+        duration = int(input("Enter simulation duration in seconds (e.g., 60): "))
+        generator.simulate_ransomware_activity_in_directory(target_dir, duration_seconds=duration)
 
 if __name__ == "__main__":
     main()

@@ -108,5 +108,8 @@ data/training/*.csv
 data/test/*.csv
 
 ransomware_env_3.11/
-ransomware_detection.db
-ransomware_detector.log
+
+
+src/test_data/*
+src/ransomware_detection.db
+src/ransomware_detector.log

@@ -13,6 +13,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from pathlib import Path
+from config import Config # Import Config
 
 class IntegrationTester:
     def __init__(self):
@@ -196,7 +197,7 @@ class IntegrationTester:
         
         try:
             # Test database creation
-            if Path("ransomware_detection.db").exists():
+            if Config.DATABASE_PATH.exists():
                 print("✅ Database file creation")
                 self.passed_tests += 1
             else:
@@ -212,7 +213,7 @@ class IntegrationTester:
                 self.failed_tests += 1
                 
             # Test model directory
-            if Path("models").exists():
+            if Config.MODELS_DIR.exists():
                 print("✅ Models directory creation")
                 self.passed_tests += 1
             else:
