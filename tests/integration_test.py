@@ -10,6 +10,8 @@ import requests
 import json
 import subprocess
 import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from pathlib import Path
 
 class IntegrationTester:
@@ -202,7 +204,7 @@ class IntegrationTester:
                 self.failed_tests += 1
                 
             # Test log file creation
-            if Path("logs").exists():
+            if Path("ransomware_detector.log").exists():
                 print("✅ Logs directory creation")
                 self.passed_tests += 1
             else:

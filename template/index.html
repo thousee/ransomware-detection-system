@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ransomware Detection System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
         * {
             margin: 0;
@@ -81,9 +83,17 @@
             margin-bottom: 5px;
         }
 
-        .status-normal { color: #38a169; }
-        .status-warning { color: #d69e2e; }
-        .status-danger { color: #e53e3e; }
+        .status-normal {
+            color: #38a169;
+        }
+
+        .status-warning {
+            color: #d69e2e;
+        }
+
+        .status-danger {
+            color: #e53e3e;
+        }
 
         .main-grid {
             display: grid;
@@ -136,8 +146,15 @@
         }
 
         @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         .controls {
@@ -190,7 +207,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 10px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
 
         .feature-item:last-child {
@@ -229,9 +246,17 @@
             border-radius: 3px;
         }
 
-        .log-info { background: rgba(66, 153, 225, 0.1); }
-        .log-warning { background: rgba(237, 137, 54, 0.1); }
-        .log-error { background: rgba(245, 101, 101, 0.1); }
+        .log-info {
+            background: rgba(66, 153, 225, 0.1);
+        }
+
+        .log-warning {
+            background: rgba(237, 137, 54, 0.1);
+        }
+
+        .log-error {
+            background: rgba(245, 101, 101, 0.1);
+        }
 
         .prediction-display {
             text-align: center;
@@ -256,9 +281,17 @@
         }
 
         @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
         }
 
         .risk-meter {
@@ -285,17 +318,18 @@
             .main-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .status-bar {
                 grid-template-columns: 1fr;
             }
-            
+
             .details-grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -319,26 +353,26 @@
                 <div class="status-value" id="riskScore">0.00</div>
                 <div class="risk-meter">
                     <svg width="200" height="200">
-                        <circle cx="100" cy="100" r="80" fill="none" stroke="#e2e8f0" stroke-width="10"/>
-                        <circle cx="100" cy="100" r="80" fill="none" stroke="#667eea" stroke-width="10" 
-                                stroke-dasharray="502.4" stroke-dashoffset="502.4" id="riskCircle"/>
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#e2e8f0" stroke-width="10" />
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#667eea" stroke-width="10"
+                            stroke-dasharray="502.4" stroke-dashoffset="502.4" id="riskCircle" />
                     </svg>
                     <div class="risk-meter-value" id="riskMeterValue">0%</div>
                 </div>
             </div>
-            
+
             <div class="status-card">
                 <h3>Active Alerts</h3>
                 <div class="status-value status-normal" id="activeAlerts">0</div>
                 <small>Last hour</small>
             </div>
-            
+
             <div class="status-card">
                 <h3>File Operations</h3>
                 <div class="status-value status-normal" id="fileOps">0</div>
                 <small>Per minute</small>
             </div>
-            
+
             <div class="status-card">
                 <h3>Suspicious Processes</h3>
                 <div class="status-value status-normal" id="suspiciousProcs">0</div>
@@ -351,7 +385,7 @@
                 <h3>Risk Score Timeline</h3>
                 <canvas id="riskChart" width="400" height="200"></canvas>
             </div>
-            
+
             <div class="alerts-container">
                 <h3>Recent Alerts</h3>
                 <div id="alertsList">
@@ -389,14 +423,14 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="details-card">
                 <h3>Feature Explanations</h3>
                 <div id="explanations">
                     <p>Start monitoring to see feature explanations...</p>
                 </div>
             </div>
-            
+
             <div class="details-card">
                 <h3>Process Monitor</h3>
                 <canvas id="processChart" width="300" height="200"></canvas>
@@ -410,7 +444,7 @@
                     <div class="log-entry log-info">[INFO] Ransomware detection system initialized</div>
                 </div>
             </div>
-            
+
             <div class="details-card">
                 <h3>Detection Statistics</h3>
                 <canvas id="statsChart" width="300" height="200"></canvas>
@@ -425,6 +459,37 @@
         let riskData = [];
         let processData = [];
         let detectionStats = { benign: 0, ransomware: 0 };
+
+        // Socket.IO client
+        const socket = io();
+
+        // Event Listeners for Socket.IO
+        socket.on('connect', function () {
+            console.log('Connected to WebSocket');
+            addSystemLog('Connected to WebSocket', 'info');
+            // Request an initial update of the system status
+            socket.emit('request_update');
+        });
+
+        socket.on('disconnect', function () {
+            console.log('Disconnected from WebSocket');
+            addSystemLog('Disconnected from WebSocket', 'warning');
+        });
+
+        socket.on('system_status', function (status) {
+            console.log('System Status:', status);
+            updateOverallStatus(status);
+        });
+
+        socket.on('new_alert', function (alert) {
+            console.log('New Alert:', alert);
+            addAlert(alert.message, alert.severity, alert.details);
+        });
+
+        socket.on('detection_update', function (detection) {
+            console.log('Detection Update:', detection);
+            updateDetectionDisplay(detection);
+        });
 
         // Initialize charts
         function initializeCharts() {
@@ -505,69 +570,207 @@
             });
         }
 
-        // Simulate real-time data
-        function generateRealtimeData() {
-            if (!monitoring) return;
+        // Control functions
+        function startMonitoring() {
+            // Make an API call to start monitoring on the backend
+            fetch('/api/start_monitoring', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        monitoring = true;
+                        addSystemLog(data.message, 'info');
+                        addAlert('Monitoring Started', 'low', 'Real-time ransomware detection is now active');
+                    } else {
+                        addSystemLog(`Failed to start monitoring: ${data.message}`, 'error');
+                        addAlert('Monitoring Start Failed', 'high', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting monitoring:', error);
+                    addSystemLog(`Error starting monitoring: ${error}`, 'error');
+                    addAlert('Monitoring Start Error', 'high', `Network error: ${error.message}`);
+                });
+        }
 
-            // Simulate risk score
-            const baseRisk = Math.random() * 0.3; // Base risk
-            let riskScore = baseRisk;
-            
-            // Occasionally simulate ransomware detection
-            if (Math.random() < 0.05) { // 5% chance
-                riskScore = 0.7 + Math.random() * 0.3; // High risk
+        function stopMonitoring() {
+            // Make an API call to stop monitoring on the backend
+            fetch('/api/stop_monitoring', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        monitoring = false;
+                        addSystemLog(data.message, 'info');
+                        addAlert('Monitoring Stopped', 'low', 'Real-time detection has been paused');
+                        document.getElementById('currentPrediction').textContent = 'MONITORING STOPPED';
+                        document.getElementById('currentPrediction').className = 'prediction-display';
+                    } else {
+                        addSystemLog(`Failed to stop monitoring: ${data.message}`, 'error');
+                        addAlert('Monitoring Stop Failed', 'high', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error stopping monitoring:', error);
+                    addSystemLog(`Error stopping monitoring: ${error}`, 'error');
+                    addAlert('Monitoring Stop Error', 'high', `Network error: ${error.message}`);
+                });
+        }
+
+        function generateTestData() {
+            // Make an API call to generate test scenario on the backend
+            fetch('/api/generate_test_scenario', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ type: 'ransomware' }) // You can make this dynamic if needed
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        addSystemLog(data.message, 'warning');
+                    } else {
+                        addSystemLog(`Failed to generate test data: ${data.message}`, 'error');
+                        addAlert('Test Data Generation Failed', 'high', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error generating test data:', error);
+                    addSystemLog(`Error generating test data: ${error}`, 'error');
+                    addAlert('Test Data Generation Error', 'high', `Network error: ${error.message}`);
+                });
+        }
+
+        function exportReport() {
+            window.location.href = '/api/export_report';
+            addSystemLog('Report export requested', 'info');
+        }
+
+        // Helper functions to update UI elements based on real-time data
+        function updateOverallStatus(status) {
+            document.getElementById('activeAlerts').textContent = status.active_alerts;
+            document.getElementById('fileOps').textContent = status.file_operations_last_minute;
+            document.getElementById('suspiciousProcs').textContent = status.suspicious_processes;
+
+            // Update risk score timeline on system status update (if available)
+            if (status.recent_risk_scores && status.recent_risk_scores.length > 0) {
+                status.recent_risk_scores.forEach(score => {
+                    const now = new Date().toLocaleTimeString();
+                    if (riskChart.data.labels.length > 20) {
+                        riskChart.data.labels.shift();
+                        riskChart.data.datasets[0].data.shift();
+                    }
+                    riskChart.data.labels.push(now);
+                    riskChart.data.datasets[0].data.push(score);
+                });
+                riskChart.update();
             }
 
-            // Update risk score display
+            // Update process chart based on suspicious processes
+            const totalProcs = status.active_processes > 0 ? status.active_processes : 1;
+            const suspiciousProcs = status.suspicious_processes;
+            const normalProcs = totalProcs - suspiciousProcs;
+            processChart.data.datasets[0].data = [normalProcs, suspiciousProcs];
+            processChart.update();
+
+            // Update system CPU, Memory, Disk features
+            document.getElementById('feat-cpu').textContent = status.system_cpu ? status.system_cpu.toFixed(1) + '%' : 'N/A';
+            document.getElementById('feat-memory').textContent = status.system_memory ? status.system_memory.toFixed(1) + '%' : 'N/A';
+            // document.getElementById('feat-network').textContent = status.network_connections; // Backend needs to provide this in system_status
+            document.getElementById('feat-processes').textContent = status.active_processes;
+
+            if (status.monitoring_active) {
+                document.getElementById('currentPrediction').textContent = 'MONITORING ACTIVE';
+                document.getElementById('currentPrediction').className = 'prediction-display prediction-benign';
+            } else {
+                document.getElementById('currentPrediction').textContent = 'MONITORING STOPPED';
+                document.getElementById('currentPrediction').className = 'prediction-display';
+            }
+        }
+
+        function updateDetectionDisplay(detection) {
+            const riskScore = detection.risk_score;
+            const prediction = detection.prediction;
+            const features = detection.features;
+            const explanation = detection.explanation;
+            const timestamp = detection.timestamp;
+
             updateRiskScore(riskScore);
+            updatePrediction(riskScore);
 
-            // Simulate system features
-            const features = {
-                fileOps: Math.floor(Math.random() * 50),
-                cpu: Math.floor(Math.random() * 100),
-                memory: Math.floor(Math.random() * 100),
-                network: Math.floor(Math.random() * 20),
-                processes: Math.floor(Math.random() * 100) + 50
-            };
-
-            updateFeatures(features);
-
-            // Generate alerts for high risk
-            if (riskScore > 0.7) {
-                addAlert('High Risk Detected', 'high', 
-                    `Risk score: ${riskScore.toFixed(2)} - Multiple suspicious indicators detected`);
-            } else if (riskScore > 0.5) {
-                addAlert('Medium Risk Detected', 'medium', 
-                    `Risk score: ${riskScore.toFixed(2)} - Some suspicious activity observed`);
-            }
+            // Update feature display
+            document.getElementById('feat-fileOps').textContent = features.file_ops_per_minute || 0;
+            // document.getElementById('feat-cpu').textContent = features.process_cpu_max ? features.process_cpu_max.toFixed(1) + '%' : 'N/A';
+            // document.getElementById('feat-memory').textContent = features.process_memory_max ? features.process_memory_max.toFixed(1) + '%' : 'N/A';
+            document.getElementById('feat-network').textContent = features.network_connections || 0;
 
             // Update detection stats
-            if (riskScore > 0.5) {
+            if (prediction === 'Ransomware') {
                 detectionStats.ransomware++;
             } else {
                 detectionStats.benign++;
             }
+            statsChart.data.datasets[0].data = [detectionStats.benign, detectionStats.ransomware];
+            statsChart.update();
 
-            updateCharts(riskScore);
-            updatePrediction(riskScore);
+            // Add system log for detection
+            addSystemLog(`Detection: ${prediction} (Risk: ${riskScore.toFixed(3)})`, 'info');
 
-            // Add system log
-            addSystemLog(`Detection completed - Risk: ${riskScore.toFixed(3)}, Features: ${JSON.stringify(features)}`, 'info');
+            // Update explanations
+            const explanationsDiv = document.getElementById('explanations');
+            if (explanation && explanation.top_features && explanation.top_features.length > 0) {
+                let html = '';
+                explanation.top_features.forEach(exp => {
+                    const impactClass = exp.importance > 0 ? 'danger' : 'normal';
+                    const impactText = exp.importance > 0 ? 'Increases risk' : 'Decreases risk';
+                    html += `
+                        <div class="feature-item">
+                            <div>
+                                <strong>${exp.feature}</strong><br>
+                                <small>Value: ${exp.value.toFixed(2)}, Impact: ${impactText}</small>
+                            </div>
+                            <span class="feature-value status-${impactClass}">${exp.importance.toFixed(2)}</span>
+                        </div>
+                    `;
+                });
+                explanationsDiv.innerHTML = html;
+            } else {
+                explanationsDiv.innerHTML = '<p>No detailed explanation available.</p>';
+            }
+
+            // Add to risk chart from detection_update
+            const now = new Date(timestamp).toLocaleTimeString();
+            if (riskChart.data.labels.length > 20) {
+                riskChart.data.labels.shift();
+                riskChart.data.datasets[0].data.shift();
+            }
+            riskChart.data.labels.push(now);
+            riskChart.data.datasets[0].data.push(riskScore);
+            riskChart.update();
         }
 
         function updateRiskScore(score) {
             const riskElement = document.getElementById('riskScore');
             const riskMeter = document.getElementById('riskMeterValue');
             const riskCircle = document.getElementById('riskCircle');
-            
+
             riskElement.textContent = score.toFixed(2);
             riskMeter.textContent = Math.round(score * 100) + '%';
-            
+
             // Update risk meter color and progress
-            const circumference = 502.4;
+            const circumference = 502.4; // 2 * pi * r (r=80)
             const progress = circumference - (score * circumference);
             riskCircle.style.strokeDashoffset = progress;
-            
+
             if (score > 0.7) {
                 riskElement.className = 'status-value status-danger';
                 riskCircle.style.stroke = '#e53e3e';
@@ -580,21 +783,9 @@
             }
         }
 
-        function updateFeatures(features) {
-            document.getElementById('feat-fileOps').textContent = features.fileOps;
-            document.getElementById('feat-cpu').textContent = features.cpu + '%';
-            document.getElementById('feat-memory').textContent = features.memory + '%';
-            document.getElementById('feat-network').textContent = features.network;
-            document.getElementById('feat-processes').textContent = features.processes;
-
-            // Update status cards
-            document.getElementById('fileOps').textContent = features.fileOps;
-            document.getElementById('suspiciousProcs').textContent = Math.floor(features.processes * 0.1);
-        }
-
         function updatePrediction(riskScore) {
             const predictionElement = document.getElementById('currentPrediction');
-            
+
             if (riskScore > 0.5) {
                 predictionElement.textContent = 'RANSOMWARE DETECTED';
                 predictionElement.className = 'prediction-display prediction-ransomware';
@@ -604,171 +795,49 @@
             }
         }
 
-        function updateCharts(riskScore) {
-            const now = new Date().toLocaleTimeString();
-            
-            // Update risk chart
-            if (riskChart.data.labels.length > 20) {
-                riskChart.data.labels.shift();
-                riskChart.data.datasets[0].data.shift();
-            }
-            
-            riskChart.data.labels.push(now);
-            riskChart.data.datasets[0].data.push(riskScore);
-            riskChart.update();
-
-            // Update process chart
-            const suspiciousProcs = riskScore > 0.5 ? Math.floor(riskScore * 100) : 10;
-            const normalProcs = 100 - suspiciousProcs;
-            
-            processChart.data.datasets[0].data = [normalProcs, suspiciousProcs];
-            processChart.update();
-
-            // Update stats chart
-            statsChart.data.datasets[0].data = [detectionStats.benign, detectionStats.ransomware];
-            statsChart.update();
-        }
-
-        function addAlert(title, severity, details) {
+        function addAlert(message, severity, details, timestamp = new Date()) {
             const alertsList = document.getElementById('alertsList');
             const alertItem = document.createElement('div');
             alertItem.className = `alert-item alert-${severity}`;
             alertItem.innerHTML = `
-                <strong>${title}</strong><br>
+                <strong>${message}</strong><br>
                 <small>${details}</small><br>
-                <em>${new Date().toLocaleTimeString()}</em>
+                <em>${new Date(timestamp).toLocaleTimeString()}</em>
             `;
-            
+
             alertsList.insertBefore(alertItem, alertsList.firstChild);
-            
+
             // Keep only last 10 alerts
             while (alertsList.children.length > 10) {
                 alertsList.removeChild(alertsList.lastChild);
             }
 
             // Update alert count
-            const alertCount = document.querySelectorAll('.alert-item').length;
-            document.getElementById('activeAlerts').textContent = alertCount;
+            document.getElementById('activeAlerts').textContent = alertsList.children.length;
         }
 
-        function addSystemLog(message, level) {
+        function addSystemLog(message, level, timestamp = new Date()) {
             const logsContainer = document.getElementById('systemLogs');
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry log-${level}`;
-            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            
+            logEntry.textContent = `[${new Date(timestamp).toLocaleTimeString()}] ${message}`;
+
             logsContainer.insertBefore(logEntry, logsContainer.firstChild);
-            
+
             // Keep only last 50 logs
             while (logsContainer.children.length > 50) {
                 logsContainer.removeChild(logsContainer.lastChild);
             }
         }
 
-        function updateExplanations() {
-            const explanationsDiv = document.getElementById('explanations');
-            
-            if (!monitoring) {
-                explanationsDiv.innerHTML = '<p>Start monitoring to see feature explanations...</p>';
-                return;
-            }
-
-            // Simulate feature explanations
-            const explanations = [
-                { feature: 'File Operations Rate', impact: 'High', description: 'Elevated file activity detected' },
-                { feature: 'Process CPU Usage', impact: 'Medium', description: 'Some processes using high CPU' },
-                { feature: 'Network Connections', impact: 'Low', description: 'Normal network activity' }
-            ];
-
-            let html = '';
-            explanations.forEach(exp => {
-                const impactClass = exp.impact.toLowerCase();
-                html += `
-                    <div class="feature-item">
-                        <div>
-                            <strong>${exp.feature}</strong><br>
-                            <small>${exp.description}</small>
-                        </div>
-                        <span class="feature-value status-${impactClass === 'high' ? 'danger' : impactClass === 'medium' ? 'warning' : 'normal'}">${exp.impact}</span>
-                    </div>
-                `;
-            });
-            
-            explanationsDiv.innerHTML = html;
-        }
-
-        // Control functions
-        function startMonitoring() {
-            monitoring = true;
-            addSystemLog('Monitoring started', 'info');
-            addAlert('Monitoring Started', 'low', 'Real-time ransomware detection is now active');
-            
-            // Start simulation interval
-            window.monitoringInterval = setInterval(generateRealtimeData, 2000);
-            window.explanationInterval = setInterval(updateExplanations, 5000);
-        }
-
-        function stopMonitoring() {
-            monitoring = false;
-            clearInterval(window.monitoringInterval);
-            clearInterval(window.explanationInterval);
-            
-            addSystemLog('Monitoring stopped', 'info');
-            addAlert('Monitoring Stopped', 'low', 'Real-time detection has been paused');
-            
-            document.getElementById('currentPrediction').textContent = 'MONITORING STOPPED';
-            document.getElementById('currentPrediction').className = 'prediction-display';
-        }
-
-        function generateTestData() {
-            addSystemLog('Generating test ransomware scenario', 'warning');
-            
-            // Simulate ransomware attack
-            for (let i = 0; i < 5; i++) {
-                setTimeout(() => {
-                    const highRisk = 0.8 + Math.random() * 0.2;
-                    updateRiskScore(highRisk);
-                    updateCharts(highRisk);
-                    updatePrediction(highRisk);
-                    
-                    addAlert('Test Ransomware Activity', 'high', 
-                        `Simulated ransomware behavior - Risk: ${highRisk.toFixed(2)}`);
-                }, i * 1000);
-            }
-        }
-
-        function exportReport() {
-            const reportData = {
-                timestamp: new Date().toISOString(),
-                detectionStats: detectionStats,
-                riskData: riskData.slice(-50),
-                alerts: Array.from(document.querySelectorAll('.alert-item')).map(alert => ({
-                    content: alert.textContent,
-                    severity: alert.className.includes('high') ? 'high' : 
-                             alert.className.includes('medium') ? 'medium' : 'low'
-                }))
-            };
-
-            const dataStr = JSON.stringify(reportData, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            const url = URL.createObjectURL(dataBlob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `ransomware_report_${new Date().getTime()}.json`;
-            link.click();
-            
-            addSystemLog('Report exported successfully', 'info');
-        }
-
         // Initialize the application
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             initializeCharts();
-            updateExplanations();
-            
-            // Auto-start monitoring for demo
-            setTimeout(startMonitoring, 1000);
+            // No auto-start, user clicks button
+            // setTimeout(startMonitoring, 1000);
         });
+
     </script>
 </body>
+
 </html>

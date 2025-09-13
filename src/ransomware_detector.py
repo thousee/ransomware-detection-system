@@ -5,11 +5,12 @@ import threading
 import json
 import sqlite3
 from datetime import datetime, timedelta
-from collections import defaultdict, deque
+from collections import defaultdict, deque, Counter
 from pathlib import Path
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
+import pandas as pd # Added for reading CSV
 import joblib
 import shap
 import logging
@@ -18,6 +19,7 @@ import hashlib
 import re
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from config import Config
 
 # Configure logging
 logging.basicConfig(
@@ -36,10 +38,7 @@ class FileSystemMonitor(FileSystemEventHandler):
     def __init__(self, detector):
         self.detector = detector
         self.file_operations = deque(maxlen=1000)
-        self.suspicious_extensions = {
-            '.encrypted', '.locked', '.crypto', '.crypt', '.xxx', 
-            '.zzz', '.locky', '.cerber', '.vault', '.petya'
-        }
+        self.suspicious_extensions = Config.SUSPICIOUS_EXTENSIONS
         
     def on_created(self, event):
         if not event.is_directory:
@@ -154,10 +153,10 @@ class ProcessMonitor:
     def _is_suspicious_process(self, process_data):
         """Check if a process exhibits suspicious behavior"""
         suspicious_patterns = [
-            process_data['cpu_percent'] > 80,  # High CPU usage
-            process_data['memory_percent'] > 70,  # High memory usage
-            process_data['num_threads'] > 100,  # Too many threads
-            process_data['connections'] > 50,  # Too many connections
+            process_data['cpu_percent'] > Config.PROCESS_CPU_THRESHOLD,  # High CPU usage
+            process_data['memory_percent'] > Config.PROCESS_MEMORY_THRESHOLD,  # High memory usage
+            process_data['num_threads'] > Config.PROCESS_THREADS_THRESHOLD,  # Too many threads
+            process_data['connections'] > Config.PROCESS_CONNECTIONS_THRESHOLD,  # Too many connections
         ]
         
         return sum(suspicious_patterns) >= 2
@@ -251,15 +250,15 @@ class RansomwareDetector:
             self.load_model(model_path)
         else:
             self._create_default_model()
-            
+
         # Database for logging
         self._init_database()
-        
+
     def _init_database(self):
         """Initialize SQLite database for logging"""
-        self.db_path = "ransomware_detection.db"
+        self.db_path = Config.DATABASE_PATH
         conn = sqlite3.connect(self.db_path)
-        
+
         conn.execute('''
             CREATE TABLE IF NOT EXISTS detections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,7 +269,7 @@ class RansomwareDetector:
                 explanation TEXT
             )
         ''')
-        
+
         conn.execute('''
             CREATE TABLE IF NOT EXISTS alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -280,34 +279,78 @@ class RansomwareDetector:
                 details TEXT
             )
         ''')
-        
+
         conn.commit()
         conn.close()
-        
-    def _create_default_model(self):
-        """Create a default model with synthetic training data"""
-        logger.info("Creating default model with synthetic data...")
-        
-        # Generate synthetic training data
-        X_train, y_train = self._generate_synthetic_data(1000)
-        
+
+    def train_model(self, data_path: Path):
+        """Train the ransomware detection model using the provided dataset."""
+        logger.info(f"Loading training data from {data_path}...")
+        try:
+            df = pd.read_csv(data_path)
+        except FileNotFoundError:
+            logger.error(f"Training data file not found at {data_path}")
+            return
+
+        # Separate features (X) and labels (y)
+        X = df[self.feature_extractor.feature_names].values
+        y = df['label'].values
+
+        logger.info(f"Training model with {len(X)} samples...")
+
+        # Scale features
+        self.scaler.fit(X)
+        X_scaled = self.scaler.transform(X)
+
         # Train model
-        self.scaler.fit(X_train)
-        X_train_scaled = self.scaler.transform(X_train)
-        
+        model_config = Config.get_model_config()['random_forest']
         self.model = RandomForestClassifier(
-            n_estimators=100, 
-            max_depth=10,
-            random_state=42,
-            n_jobs=-1
+            n_estimators=model_config['n_estimators'],
+            max_depth=model_config['max_depth'],
+            min_samples_split=model_config['min_samples_split'],
+            min_samples_leaf=model_config['min_samples_leaf'],
+            random_state=model_config['random_state'],
+            n_jobs=model_config['n_jobs']
         )
-        self.model.fit(X_train_scaled, y_train)
-        
+        self.model.fit(X_scaled, y)
+
         # Create explainer
         self.explainer = shap.TreeExplainer(self.model)
-        
-        logger.info("Default model created successfully")
-        
+
+        # Save the trained model and scaler
+        joblib.dump(self.model, Config.DEFAULT_MODEL_PATH)
+        joblib.dump(self.scaler, Config.FEATURE_SCALER_PATH)
+        logger.info(f"Model saved to {Config.DEFAULT_MODEL_PATH}")
+        logger.info(f"Feature scaler saved to {Config.FEATURE_SCALER_PATH}")
+
+        logger.info("Model training completed successfully.")
+
+    def _create_default_model(self):
+        """Create a default model, attempting to train with generated data."""
+        logger.info("Attempting to create/train default model...")
+        Config.MODELS_DIR.mkdir(exist_ok=True)
+
+        if Config.TRAINING_DATASET_PATH.exists():
+            self.train_model(Config.TRAINING_DATASET_PATH)
+        else:
+            logger.warning("Training dataset not found. Creating a minimal synthetic model for startup.")
+            # Fallback to minimal synthetic data if no training_dataset.csv exists
+            X_train, y_train = self._generate_synthetic_data_fallback(100)
+            self.scaler.fit(X_train)
+            X_train_scaled = self.scaler.transform(X_train)
+            model_config = Config.get_model_config()['random_forest']
+            self.model = RandomForestClassifier(
+                n_estimators=model_config['n_estimators'],
+                max_depth=model_config['max_depth'],
+                random_state=model_config['random_state'],
+                n_jobs=model_config['n_jobs']
+            )
+            self.model.fit(X_train_scaled, y_train)
+            self.explainer = shap.TreeExplainer(self.model)
+            joblib.dump(self.model, Config.DEFAULT_MODEL_PATH)
+            joblib.dump(self.scaler, Config.FEATURE_SCALER_PATH)
+            logger.info("Minimal synthetic model created and saved.")
+
     def _generate_synthetic_data(self, n_samples):
         """Generate synthetic training data"""
         X = []
@@ -352,6 +395,30 @@ class RansomwareDetector:
             X.append(features)
             
         return np.array(X), np.array(y)
+
+    def _generate_synthetic_data_fallback(self, n_samples):
+        """Generate minimal synthetic training data for fallback scenario"""
+        X = []
+        y = []
+        for _ in range(n_samples):
+            if np.random.random() < 0.5:  # 50% ransomware samples
+                features = [
+                    np.random.exponential(50), np.random.poisson(10), np.random.poisson(3),
+                    np.random.normal(50, 10), np.random.normal(70, 10), np.random.normal(40, 15),
+                    np.random.normal(60, 15), np.random.poisson(30), np.random.poisson(10),
+                    np.random.exponential(20), np.random.exponential(10), np.random.exponential(40),
+                ]
+                y.append(1)  # Ransomware
+            else:
+                features = [
+                    np.random.exponential(5), np.random.poisson(2), 0,
+                    np.random.normal(10, 5), np.random.normal(20, 10), np.random.normal(15, 5),
+                    np.random.normal(25, 10), np.random.poisson(10), np.random.poisson(2),
+                    np.random.poisson(2), np.random.poisson(1), np.random.poisson(5),
+                ]
+                y.append(0)  # Benign
+            X.append(features)
+        return np.array(X), np.array(y)
         
     def start_monitoring(self):
         """Start the ransomware detection system"""
@@ -359,7 +426,8 @@ class RansomwareDetector:
         
         # Start file system monitoring
         observer = Observer()
-        observer.schedule(self.file_monitor, path='/', recursive=True)
+        for path in Config.FILE_MONITOR_PATHS:
+            observer.schedule(self.file_monitor, path=path, recursive=True)
         observer.start()
         
         # Start process monitoring

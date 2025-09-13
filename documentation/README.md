@@ -35,7 +35,7 @@ chmod +x install.sh
 ```bash
 # Create virtual environment
 python3 -m venv ransomware_env
-source ransomware_env/bin/activate  # On Windows: ransomware_env\Scripts\activate
+source ransomware_env/bin/activate  # On Windows: .\ransomware_env_3.11\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt

@@ -5,7 +5,7 @@ class Config:
     """Configuration settings for the ransomware detection system"""
     
     # Paths
-    BASE_DIR = Path(__file__).parent
+    BASE_DIR = Path(__file__).resolve().parents[1]
     DATA_DIR = BASE_DIR / "data"
     MODELS_DIR = BASE_DIR / "models"
     LOGS_DIR = BASE_DIR / "logs"
@@ -17,13 +17,21 @@ class Config:
     # Model settings
     DEFAULT_MODEL_PATH = MODELS_DIR / "ransomware_model.joblib"
     FEATURE_SCALER_PATH = MODELS_DIR / "feature_scaler.joblib"
+    TRAINING_DATASET_PATH = BASE_DIR / "test_data" / "training_dataset.csv"
     
     # Monitoring settings
-    FILE_MONITOR_PATHS = ["/home", "/Documents", "/Desktop"]  # Adjust for your system
+    # FILE_MONITOR_PATHS = ["/home", "/Documents", "/Desktop"]  # Adjust for your system
+    FILE_MONITOR_PATHS = ["D:\\testing123",]
     MONITORING_INTERVAL = 5  # seconds
     MAX_ALERTS = 1000
     MAX_DETECTIONS = 10000
-    
+
+    # Suspicious activity patterns
+    SUSPICIOUS_EXTENSIONS = {
+        '.encrypted', '.locked', '.crypto', '.crypt', '.xxx',
+        '.zzz', '.locky', '.cerber', '.vault', '.petya'
+    }
+
     # Detection thresholds
     HIGH_RISK_THRESHOLD = 0.7
     MEDIUM_RISK_THRESHOLD = 0.4
@@ -46,7 +54,13 @@ class Config:
     # Resource constraints (for resource-constrained environments)
     MAX_CPU_USAGE = 10  # Max CPU usage percentage for the detector itself
     MAX_MEMORY_USAGE = 100  # Max memory usage in MB
-    
+
+    # Process Monitoring Thresholds
+    PROCESS_CPU_THRESHOLD = 80
+    PROCESS_MEMORY_THRESHOLD = 70
+    PROCESS_THREADS_THRESHOLD = 100
+    PROCESS_CONNECTIONS_THRESHOLD = 50
+
     @classmethod
     def create_directories(cls):
         """Create necessary directories"""
