@@ -17,12 +17,12 @@ class Config:
     # Model settings
     DEFAULT_MODEL_PATH = MODELS_DIR / "ransomware_model.joblib"
     FEATURE_SCALER_PATH = MODELS_DIR / "feature_scaler.joblib"
-    TRAINING_DATASET_PATH = BASE_DIR / "test_data" / "training_dataset.csv"
+    TRAINING_DATASET_PATH = BASE_DIR / "src" / "test_data" / "training_dataset.csv"
     
     # Monitoring settings
     # FILE_MONITOR_PATHS = ["/home", "/Documents", "/Desktop"]  # Adjust for your system
     FILE_MONITOR_PATHS = ["D:\\testing123",]
-    MONITORING_INTERVAL = 5  # seconds
+    MONITORING_INTERVAL = 20  # seconds
     MAX_ALERTS = 1000
     MAX_DETECTIONS = 10000
 
@@ -33,8 +33,8 @@ class Config:
     }
 
     # Detection thresholds
-    HIGH_RISK_THRESHOLD = 0.7
-    MEDIUM_RISK_THRESHOLD = 0.4
+    HIGH_RISK_THRESHOLD = 0.5
+    MEDIUM_RISK_THRESHOLD = 0.3
     
     # Performance settings
     MAX_PROCESSES_TO_MONITOR = 100
@@ -48,12 +48,12 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-change-in-production")
     
     # Logging
-    LOG_LEVEL = "INFO"
+    LOG_LEVEL = "WARNING"
     LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     # Resource constraints (for resource-constrained environments)
-    MAX_CPU_USAGE = 10  # Max CPU usage percentage for the detector itself
-    MAX_MEMORY_USAGE = 100  # Max memory usage in MB
+    MAX_CPU_USAGE = 20  # Max CPU usage percentage for the detector itself
+    MAX_MEMORY_USAGE = 200  # Max memory usage in MB
 
     # Process Monitoring Thresholds
     PROCESS_CPU_THRESHOLD = 80
@@ -72,8 +72,8 @@ class Config:
         """Get machine learning model configuration"""
         return {
             'random_forest': {
-                'n_estimators': 50,  # Reduced for resource constraints
-                'max_depth': 8,
+                'n_estimators': 30,  # Reduced for resource constraints
+                'max_depth': 6,
                 'min_samples_split': 5,
                 'min_samples_leaf': 2,
                 'random_state': 42,

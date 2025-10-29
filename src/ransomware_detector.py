@@ -37,12 +37,17 @@ class FileSystemMonitor(FileSystemEventHandler):
     
     def __init__(self, detector):
         self.detector = detector
-        self.file_operations = deque(maxlen=1000)
+        self.file_operations = deque(maxlen=200)
         self.suspicious_extensions = Config.SUSPICIOUS_EXTENSIONS
         
     def on_created(self, event):
         if not event.is_directory:
             self._record_operation('created', event.src_path)
+            # Immediately check for suspicious extension on creation
+            if Path(event.src_path).suffix.lower() in self.suspicious_extensions:
+                self.detector.add_alert("Suspicious file created with ransomware extension",
+                                      severity="high",
+                                      details=f"File: {event.src_path}")
             
     def on_deleted(self, event):
         if not event.is_directory:
@@ -144,11 +149,10 @@ class ProcessMonitor:
                 self.process_stats = current_processes
                 self._analyze_process_patterns()
                 
-                time.sleep(2)  # Monitor every 2 seconds
+                time.sleep(Config.MONITORING_INTERVAL)  # Monitor every Config.MONITORING_INTERVAL seconds
                 
             except Exception as e:
                 logger.error(f"Error in process monitoring: {e}")
-                time.sleep(5)
                 
     def _is_suspicious_process(self, process_data):
         """Check if a process exhibits suspicious behavior"""
@@ -479,11 +483,10 @@ class RansomwareDetector:
                         details=f"Top suspicious features: {explanation['top_features']}"
                     )
                 
-                time.sleep(5)  # Check every 5 seconds
+                time.sleep(Config.MONITORING_INTERVAL)  # Check every Config.MONITORING_INTERVAL seconds
                 
             except Exception as e:
                 logger.error(f"Error in detection loop: {e}")
-                time.sleep(10)
                 
     def _generate_explanation(self, features):
         """Generate explanation for the prediction"""

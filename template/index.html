@@ -483,7 +483,8 @@
 
         socket.on('new_alert', function (alert) {
             console.log('New Alert:', alert);
-            addAlert(alert.message, alert.severity, alert.details);
+            // Pass explanation if included by the server
+            addAlert(alert.message, alert.severity, alert.details, alert.timestamp, alert.explanation);
         });
 
         socket.on('detection_update', function (detection) {
@@ -657,7 +658,10 @@
 
         // Helper functions to update UI elements based on real-time data
         function updateOverallStatus(status) {
-            document.getElementById('activeAlerts').textContent = status.active_alerts;
+            // Cap/format active alerts for display
+            let active = status.active_alerts || 0;
+            let activeDisplay = active > 999 ? '999+' : active.toLocaleString();
+            document.getElementById('activeAlerts').textContent = activeDisplay;
             document.getElementById('fileOps').textContent = status.file_operations_last_minute;
             document.getElementById('suspiciousProcs').textContent = status.suspicious_processes;
 
@@ -799,11 +803,54 @@
             const alertsList = document.getElementById('alertsList');
             const alertItem = document.createElement('div');
             alertItem.className = `alert-item alert-${severity}`;
+            // Render details and optional explanation (SHAP) cleanly
+            let detailsHtml = '';
+            if (details) {
+                // If details is an object (rare), try to pretty-print
+                if (typeof details === 'object') {
+                    try {
+                        detailsHtml = `<small>${JSON.stringify(details)}</small><br>`;
+                    } catch (e) {
+                        detailsHtml = `<small>${String(details)}</small><br>`;
+                    }
+                } else {
+                    detailsHtml = `<small>${details}</small><br>`;
+                }
+            }
+
             alertItem.innerHTML = `
                 <strong>${message}</strong><br>
-                <small>${details}</small><br>
+                ${detailsHtml}
                 <em>${new Date(timestamp).toLocaleTimeString()}</em>
             `;
+
+            // If caller provided a SHAP explanation object on the global 'arguments'
+            // The server may pass explanation as a fifth argument to addAlert — handle it if present
+            // Note: We cannot rely on function overloading in JS when called from Socket.IO above,
+            // so callers should pass the explanation as the fifth parameter. We'll inspect `arguments`.
+            const maybeExplanation = arguments[4];
+            if (maybeExplanation && typeof maybeExplanation === 'object') {
+                try {
+                    const expl = maybeExplanation;
+                    if (expl.top_features && Array.isArray(expl.top_features) && expl.top_features.length > 0) {
+                        const explContainer = document.createElement('div');
+                        explContainer.style.marginTop = '8px';
+                        explContainer.innerHTML = '<strong>Top features:</strong>';
+                        const ul = document.createElement('ul');
+                        ul.style.margin = '6px 0 0 14px';
+                        expl.top_features.forEach(tf => {
+                            const li = document.createElement('li');
+                            li.style.fontSize = '0.9em';
+                            li.textContent = `${tf.feature}: ${typeof tf.value === 'number' ? tf.value.toFixed(2) : tf.value} (${tf.importance.toFixed ? tf.importance.toFixed(3) : tf.importance}) — ${tf.impact || ''}`;
+                            ul.appendChild(li);
+                        });
+                        explContainer.appendChild(ul);
+                        alertItem.appendChild(explContainer);
+                    }
+                } catch (e) {
+                    console.warn('Error rendering explanation for alert:', e);
+                }
+            }
 
             alertsList.insertBefore(alertItem, alertsList.firstChild);
 
@@ -830,10 +877,53 @@
             }
         }
 
+        // Polling / fallback variables
+        let lastSeenDetectionTimestamp = null;
+        let pollingIntervalHandle = null;
+
+        // Polling fallback: fetch latest system_status and detections periodically
+        async function pollUpdates() {
+            try {
+                // System status
+                const statusResp = await fetch('/api/system_status');
+                if (statusResp.ok) {
+                    const status = await statusResp.json();
+                    updateOverallStatus(status);
+                }
+
+                // Detections - get latest
+                const detResp = await fetch('/api/detections');
+                if (detResp.ok) {
+                    const detections = await detResp.json();
+                    if (Array.isArray(detections) && detections.length > 0) {
+                        const latest = detections[detections.length - 1];
+
+                        // Compare timestamps to avoid reprocessing same detection
+                        const ts = latest.timestamp || latest.time || null;
+                        if (ts && ts !== lastSeenDetectionTimestamp) {
+                            lastSeenDetectionTimestamp = ts;
+                            updateDetectionDisplay(latest);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Polling error (will retry):', err);
+                addSystemLog(`Polling error: ${err.message || err}`, 'warning');
+            }
+        }
+
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function () {
             initializeCharts();
-            // No auto-start, user clicks button
+
+            // Start polling as a fallback to ensure UI updates even when WebSocket drops
+            // Poll every 5 seconds (matches server monitoring granularity)
+            if (!pollingIntervalHandle) {
+                pollUpdates(); // immediate first poll
+                pollingIntervalHandle = setInterval(pollUpdates, 5000);
+            }
+
+            // No auto-start of monitoring; user clicks button to start
             // setTimeout(startMonitoring, 1000);
         });
 

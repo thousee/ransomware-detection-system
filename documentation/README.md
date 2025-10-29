@@ -487,3 +487,12 @@ python -m pytest tests/        # Run pytest suite
 python -c "from config import Config; Config.create_directories()"  # Setup dirs
 python web_server.py --port 8080  # Custom port
 ```
+
+### Real-time updates (notes)
+
+The web UI uses WebSocket (Flask-SocketIO) to receive real-time `system_status`, `detection_update`, and `new_alert` events from the server. In environments where the WebSocket connection may be unreliable, the frontend also includes a lightweight polling fallback that requests `/api/system_status` and `/api/detections` every 5 seconds to keep the dashboard current without a manual page refresh.
+
+If you still need to refresh the page frequently, check the following:
+- Confirm the server is started with `python web_server.py` (or via `run_server.sh`).
+- Verify the socket connection logs in the browser console for `Connected to WebSocket` or any errors.
+- If using a reverse proxy (nginx, load balancer), ensure it allows WebSocket upgrades.

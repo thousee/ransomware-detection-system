@@ -636,3 +636,145 @@ def main():
 if __name__ == "__main__":
     main()
     
+
+
+    
+# import argparse
+# import os
+# import random
+# from datetime import datetime, timedelta
+
+# import numpy as np
+# import pandas as pd
+
+
+# def generate_benign_realistic(ts):
+#     return {
+#         "timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
+#         "file_ops_per_minute": int(np.random.randint(50, 1200)),
+#         "unique_extensions_accessed": int(np.random.randint(1, 25)),
+#         "suspicious_extensions": int(np.random.randint(0, 6)),
+#         "process_cpu_mean": float(round(np.random.uniform(1, 40), 2)),
+#         "process_cpu_max": float(round(np.random.uniform(10, 70), 2)),
+#         "process_memory_mean": int(np.random.randint(100, 1200)),
+#         "process_memory_max": int(np.random.randint(200, 2500)),
+#         "active_processes": int(np.random.randint(20, 250)),
+#         "network_connections": int(np.random.randint(1, 40)),
+#         "file_creation_rate": int(np.random.randint(1, 120)),
+#         "file_deletion_rate": int(np.random.randint(0, 30)),
+#         "file_modification_rate": int(np.random.randint(5, 120)),
+#         "label": 0,
+#         "family": "Benign",
+#     }
+
+
+# def generate_ransom_realistic(ts, families):
+#     return {
+#         "timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
+#         "file_ops_per_minute": int(np.random.randint(500, 5000)),
+#         "unique_extensions_accessed": int(np.random.randint(10, 200)),
+#         "suspicious_extensions": int(np.random.randint(2, 50)),
+#         "process_cpu_mean": float(round(np.random.uniform(20, 95), 2)),
+#         "process_cpu_max": float(round(np.random.uniform(40, 100), 2)),
+#         "process_memory_mean": int(np.random.randint(300, 2500)),
+#         "process_memory_max": int(np.random.randint(500, 4500)),
+#         "active_processes": int(np.random.randint(50, 450)),
+#         "network_connections": int(np.random.randint(5, 120)),
+#         "file_creation_rate": int(np.random.randint(50, 600)),
+#         "file_deletion_rate": int(np.random.randint(10, 350)),
+#         "file_modification_rate": int(np.random.randint(50, 1200)),
+#         "label": 1,
+#         "family": random.choice(families),
+#     }
+
+
+# def create_dataset(n_samples=100000, benign_ratio=0.7, label_noise=0.01, start_time=None, families=None):
+#     if families is None:
+#         families = ["WannaCry", "Locky", "Petya", "Cerber", "CryptoLocker"]
+
+#     n_benign = int(n_samples * benign_ratio)
+#     n_ransom = n_samples - n_benign
+
+#     if start_time is None:
+#         # pick a deterministic start so timestamps are sensible
+#         start_time = datetime(2025, 1, 1, 0, 0, 0)
+
+#     timestamps = [start_time + timedelta(seconds=i * 60) for i in range(n_samples)]
+    
+#     data = []
+#     for ts in timestamps[:n_benign]:
+#         data.append(generate_benign_realistic(ts))
+#     for ts in timestamps[n_benign:]:
+#         data.append(generate_ransom_realistic(ts, families))
+
+#     # Apply label noise (flip label for a fraction of samples)
+#     if label_noise and label_noise > 0:
+#         n_noisy = int(len(data) * label_noise)
+#         noisy_indices = np.random.choice(len(data), size=n_noisy, replace=False)
+#         for idx in noisy_indices:
+#             old_label = data[idx]["label"]
+#             new_label = 1 - old_label
+#             data[idx]["label"] = new_label
+#             if new_label == 0:
+#                 data[idx]["family"] = "Benign"
+#             else:
+#                 data[idx]["family"] = random.choice(families)
+
+#     random.shuffle(data)
+#     df = pd.DataFrame(data)
+#     return df
+
+
+# def main():
+#     parser = argparse.ArgumentParser(description="Generate realistic synthetic ransomware dataset (CSV).")
+#     parser.add_argument("--samples", "-n", type=int, default=100000, help="Number of samples (rows) to generate")
+#     parser.add_argument(
+#         "--benign-ratio",
+#         "-b",
+#         type=float,
+#         default=0.7,
+#         help="Fraction of samples that are benign (0-1). Default 0.7",
+#     )
+#     parser.add_argument(
+#         "--noise",
+#         "-l",
+#         type=float,
+#         default=0.01,
+#         help="Label noise fraction (0-1). Default 0.01 (1% mislabeled)",
+#     )
+#     parser.add_argument(
+#         "--out", "-o", type=str, default="ransomware_dataset_realistic.csv", help="Output CSV file path"
+#     )
+#     parser.add_argument(
+#         "--seed", "-s", type=int, default=42, help="Random seed for reproducibility (default: 42)"
+#     )
+
+#     args = parser.parse_args()
+
+#     np.random.seed(args.seed)
+#     random.seed(args.seed)
+
+#     print(f"Generating dataset: samples={args.samples}, benign_ratio={args.benign_ratio}, noise={args.noise}")
+
+#     df = create_dataset(n_samples=args.samples, benign_ratio=args.benign_ratio, label_noise=args.noise)
+
+#     out_dir = os.path.dirname(os.path.abspath(args.out))
+#     if out_dir and not os.path.exists(out_dir):
+#         os.makedirs(out_dir, exist_ok=True)
+
+#     df.to_csv(args.out, index=False)
+
+#     # Provide summary
+#     total = len(df)
+#     ransomware_count = int(df["label"].sum())
+#     benign_count = total - ransomware_count
+#     print("\nDataset generation complete.")
+#     print(f"Saved to: {os.path.abspath(args.out)}")
+#     print(f"Total samples: {total}")
+#     print(f"Ransomware samples (label=1): {ransomware_count}")
+#     print(f"Benign samples (label=0): {benign_count}")
+
+
+# if __name__ == "__main__":
+#     main()
+    

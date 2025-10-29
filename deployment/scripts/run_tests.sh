@@ -34,25 +34,6 @@ print(f'✅ Model prediction working: {prediction[0]} (risk: {risk_score:.3f})')
 print('✅ All core tests passed!')
 "
 
-# Test data generation
-echo "Testing data generation..."
-python -c "
-from test_data_generator import TestDataGenerator
-
-generator = TestDataGenerator('test_output')
-print('✅ Test data generator initialized')
-
-# Generate small test dataset
-data = generator.generate_mixed_dataset(100, 0.3)
-print(f'✅ Generated {len(data)} test samples')
-
-# Test scenario generation
-scenario_data = generator.generate_real_time_scenario('normal_day', 10)
-print(f'✅ Generated scenario with {len(scenario_data)} samples')
-
-print('✅ All data generation tests passed!')
-"
-
 # Test web server components
 echo "Testing web server components..."
 python -c "

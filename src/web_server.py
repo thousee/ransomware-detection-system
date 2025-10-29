@@ -35,17 +35,33 @@ class WebRansomwareDetector(RansomwareDetector):
         
     def add_alert(self, message, severity="medium", details=""):
         """Override to emit alerts via websocket"""
-        alert = super().add_alert(message, severity, details)
-        
+        # Call base implementation to append to alert deque and log
+        super().add_alert(message, severity, details)
+
+        # Try to attach the most relevant explanation (if a recent detection exists)
+        explanation = None
+        try:
+            if hasattr(self, 'detection_history') and self.detection_history:
+                # Use the most recent detection as the likely source of the alert
+                latest = self.detection_history[-1]
+                explanation = latest.get('explanation')
+        except Exception:
+            explanation = None
+
         if self.socketio:
-            self.socketio.emit('new_alert', {
+            payload = {
                 'message': message,
                 'severity': severity,
                 'details': details,
                 'timestamp': datetime.now().isoformat()
-            })
-            
-        return alert
+            }
+
+            if explanation:
+                payload['explanation'] = explanation
+
+            self.socketio.emit('new_alert', payload)
+
+        return None
         
     def emit_detection_update(self, detection_result):
         """Emit real-time detection updates"""
@@ -222,17 +238,9 @@ def generate_test_scenario():
             'status': 'error',
             'message': 'Detector not initialized'
         })
-    
     try:
         if scenario_type == 'ransomware':
-            # Simulate ransomware detection
-            detector.add_alert(
-                "TEST: Ransomware simulation activated",
-                severity="high",
-                details="Simulating file encryption patterns, process injection, and network communication"
-            )
-            
-            # Create fake high-risk detection
+            # Create fake high-risk detection first
             test_detection = {
                 'timestamp': datetime.now(),
                 'risk_score': 0.95,
@@ -246,22 +254,30 @@ def generate_test_scenario():
                     ]
                 }
             }
-            
+
+            # Append detection and emit update before creating the alert so the alert can include an explanation
             detector.detection_history.append(test_detection)
             detector.emit_detection_update(test_detection)
-            
+
+            # Now simulate ransomware detection alert (will attach explanation from latest detection)
+            detector.add_alert(
+                "TEST: Ransomware simulation activated",
+                severity="high",
+                details="Simulating file encryption patterns, process injection, and network communication"
+            )
+
         elif scenario_type == 'normal_high_activity':
             detector.add_alert(
                 "TEST: High system activity simulation",
                 severity="medium",
                 details="Simulating legitimate high system activity (software installation, file backup, etc.)"
             )
-            
+
         return jsonify({
             'status': 'success',
             'message': f'Test scenario "{scenario_type}" generated successfully'
         })
-        
+
     except Exception as e:
         return jsonify({
             'status': 'error',
