@@ -17,6 +17,7 @@ class Config:
     # Model settings
     DEFAULT_MODEL_PATH = MODELS_DIR / "ransomware_model.joblib"
     FEATURE_SCALER_PATH = MODELS_DIR / "feature_scaler.joblib"
+    # TRAINING_DATASET_PATH = BASE_DIR / "src" / "ransomware_dataset_realistic.csv"
     TRAINING_DATASET_PATH = BASE_DIR / "src" / "test_data" / "training_dataset.csv"
     
     # Monitoring settings
