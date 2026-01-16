@@ -86,6 +86,7 @@ models/*.joblib
 models/*.pkl
 test_data/*.csv
 test_data/*.json
+ransomware-detection-system/documentation
 
 # Secrets and keys
 *.pem
